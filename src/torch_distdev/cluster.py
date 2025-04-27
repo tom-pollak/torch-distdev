@@ -116,7 +116,8 @@ class Cluster:
             MASTER_ADDR="127.0.0.1",
             MASTER_PORT=port,
             RANK=str(rank),
-            WORLD_SIZE=str(world),
+            LOCAL_RANK=str(rank),
+            WORLD_SIZE=str(world - 1),  # not including controller
         )
         dist.init_process_group(backend, rank=rank, world_size=world)
         rpc.init_rpc(
