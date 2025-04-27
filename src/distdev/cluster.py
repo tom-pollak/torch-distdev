@@ -7,6 +7,7 @@ import logging
 from logging.handlers import QueueListener, QueueHandler
 import warnings
 from functools import cache
+import contextlib
 
 import torch.multiprocessing as mp
 import torch.distributed as dist
@@ -27,9 +28,21 @@ def _install_source(src: str, name: str):
 
 
 def _mk_log_listener(log_q):
+    """Creates and configures the log listener."""
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(logging.Formatter("[%(rank)s]: %(message)s"))
     return QueueListener(log_q, handler)
+
+
+@contextlib.contextmanager
+def _logging_context(log_q):
+    """Context manager to start/stop the log listener."""
+    listener = _mk_log_listener(log_q)
+    listener.start()
+    try:
+        yield
+    finally:
+        listener.stop()
 
 
 def _set_logger(rank, log_q):
@@ -47,6 +60,11 @@ def _free_port():
     p = s.getsockname()[1]
     s.close()
     return str(p)
+
+
+def _exec_cell(src: str):
+    """Run arbitrary source in the worker's global scope."""
+    exec(src, globals())
 
 
 class Cluster:
@@ -90,26 +108,25 @@ class Cluster:
     @cache
     def _register(self, fn):
         """Send `fn`'s source to every worker once."""
-        if hasattr(fn, "__source__"):
-            src = fn.__source__
-        else:
-            src = textwrap.dedent(inspect.getsource(fn))
+        src = textwrap.dedent(inspect.getsource(fn))
         for i in range(self.nprocs):
             rpc.rpc_sync(f"w{i}", _install_source, args=(src, fn.__name__))
 
-    def launch(self, fn, *a, **kw):
-        listener = _mk_log_listener(self._log_q)
-        listener.start()
-        self._register(fn)
-        try:
-            resp = tuple(
-                [
-                    rpc.rpc_sync(f"w{i}", fn, args=a, kwargs=kw)
-                    for i in range(self.nprocs)
-                ]
+    def launch_cell(self, cell: str):
+        """Run the notebook cell on all workers."""
+        with _logging_context(self._log_q):
+            return tuple(
+                rpc.rpc_sync(f"w{i}", _exec_cell, args=(cell,))
+                for i in range(self.nprocs)
             )
-        finally:
-            listener.stop()
+
+    def launch(self, fn, *a, **kw):
+        """Launch a registered function `fn` on all workers."""
+        self._register(fn)
+        with _logging_context(self._log_q):
+            resp = tuple(
+                rpc.rpc_sync(f"w{i}", fn, args=a, kwargs=kw) for i in range(self.nprocs)
+            )
         return resp
 
     def close(self):

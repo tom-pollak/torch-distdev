@@ -21,14 +21,7 @@ def _maybe_register_magic():
         cl = get_cluster()
         if cl is None:
             raise RuntimeError("Call `init_dist()` before using %%distributed")
-
-        src = textwrap.indent(cell, "    ")
-        code = f"def _dist_user_fn():\n{src}"
-        ns = {}
-        exec(code, ns)
-        fn = ns["_dist_user_fn"]
-        fn.__source__ = cell
-        return cl.launch(fn)
+        return cl.launch_cell(cell)
 
 
 _maybe_register_magic()

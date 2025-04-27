@@ -1,7 +1,7 @@
 [project]
-name = "distdev"
+name = "torch-distdev"
 version = "0.1.0"
-description = "Add your description here"
+description = "Distributed PyTorch development without the pain."
 readme = "README.md"
 authors = [{ name = "Tom Pollak", email = "tompollak1000@gmail.com" }]
 requires-python = ">=3.10"

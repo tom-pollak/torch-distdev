@@ -3,13 +3,15 @@
 **Distributed PyTorch development without the pain.**
 
 Running `torch.distributed` or RPC code inside a notebook normally means
-lots of boiler-plate, multiple terminals, or a full Slurm cluster.  **torch-distdev**
+lots of boiler-plate, multiple terminals, or a full Slurm cluster. **torch-distdev**
 condenses that down to:
 
 ```python
-import torch_distdev as td
-td.init_dist(nprocs=4)
+# %%
+from torch_distdev import init_dist
+init_dist(nprocs=4)
 
+# %%
 %%distributed
 import os, logging
 logging.info("hello from rank %s", os.environ["RANK"])
