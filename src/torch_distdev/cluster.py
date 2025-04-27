@@ -1,5 +1,5 @@
+import ast
 import contextlib
-import torch.distributed.utils
 import inspect
 import logging
 import os
@@ -12,6 +12,7 @@ from logging.handlers import QueueHandler, QueueListener
 
 import torch.distributed as dist
 import torch.distributed.rpc as rpc
+import torch.distributed.utils
 import torch.multiprocessing as mp
 
 warnings.filterwarnings(
@@ -64,8 +65,29 @@ def _free_port():
 
 
 def _exec_cell(src: str):
-    """Run arbitrary source in the worker's global scope."""
-    exec(src, globals())
+    """Run arbitrary source in the worker's global scope and return the result of the last expression."""
+    try:
+        tree = ast.parse(src)
+        if not tree.body:
+            return None
+
+        last_node = tree.body[-1]
+
+        if isinstance(last_node, ast.Expr):
+            exec_nodes = tree.body[:-1]
+            eval_node = ast.Expression(body=last_node.value)
+            exec_code = compile(
+                ast.Module(body=exec_nodes, type_ignores=[]), "<string>", "exec"
+            )
+            eval_code = compile(eval_node, "<string>", "eval")
+            exec(exec_code, globals())
+            return eval(eval_code, globals())
+        else:
+            exec(src, globals())
+            return None
+    except Exception as e:
+        logging.error(f"Error executing cell:\n{src}\nError: {e}")
+        raise
 
 
 class Cluster:
