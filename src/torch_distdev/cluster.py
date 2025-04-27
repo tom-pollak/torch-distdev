@@ -10,6 +10,7 @@ from functools import cache
 import contextlib
 
 import torch.multiprocessing as mp
+import torch.multiprocessing.spawn as spawn
 import torch.distributed as dist
 import torch.distributed.rpc as rpc
 
@@ -73,7 +74,7 @@ class Cluster:
         self.port = _free_port()
         self._log_q = mp.get_context("spawn").Queue()
         world = nprocs + 1
-        self.ctx = mp.start_processes(
+        self.ctx: spawn.ProcessContext = spawn.start_processes(  # type: ignore
             self._worker,
             args=(world, self.port, self._log_q),
             nprocs=nprocs,
@@ -97,7 +98,7 @@ class Cluster:
             name="controller" if controller else f"w{rank}",
             rank=rank,
             world_size=world,
-            rpc_backend_options=rpc.TensorPipeRpcBackendOptions(
+            rpc_backend_options=rpc.options.TensorPipeRpcBackendOptions(
                 init_method=f"tcp://127.0.0.1:{port}"
             ),
         )
