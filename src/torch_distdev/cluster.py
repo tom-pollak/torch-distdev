@@ -12,7 +12,6 @@ from logging.handlers import QueueHandler, QueueListener
 import torch.distributed as dist
 import torch.distributed.rpc as rpc
 import torch.multiprocessing as mp
-import torch.multiprocessing.spawn as spawn
 
 warnings.filterwarnings(
     "ignore",
@@ -74,7 +73,7 @@ class Cluster:
         self.port = _free_port()
         self._log_q = mp.get_context("spawn").Queue()
         world = nprocs + 1
-        self.ctx: spawn.ProcessContext = spawn.start_processes(  # type: ignore
+        self.ctx: mp.ProcessContext = mp.start_processes(  # type: ignore
             self._worker,
             args=(world, self.port, self._log_q),
             nprocs=nprocs,
