@@ -1,4 +1,5 @@
 import contextlib
+import torch.distributed.utils
 import inspect
 import logging
 import os
@@ -68,23 +69,26 @@ def _exec_cell(src: str):
 
 
 class Cluster:
-    def __init__(self, nprocs=4):
+    def __init__(self, backend: str, nprocs: int):
         self.nprocs = nprocs
+        self.backend = backend
         self.port = _free_port()
         self._log_q = mp.get_context("spawn").Queue()
         world = nprocs + 1
         self.ctx: mp.ProcessContext = mp.start_processes(  # type: ignore
             self._worker,
-            args=(world, self.port, self._log_q),
+            args=(world, self.port, self._log_q, self.backend),
             nprocs=nprocs,
             start_method="spawn",
             join=False,
         )
         # controller -- final rank
-        self._worker(world - 1, world, self.port, self._log_q, controller=True)
+        self._worker(
+            world - 1, world, self.port, self._log_q, self.backend, controller=True
+        )
 
     @staticmethod
-    def _worker(rank, world, port, log_q, controller=False):
+    def _worker(rank, world, port, log_q, backend, controller=False):
         _set_logger(rank, log_q)
         os.environ.update(
             MASTER_ADDR="127.0.0.1",
@@ -92,7 +96,7 @@ class Cluster:
             RANK=str(rank),
             WORLD_SIZE=str(world),
         )
-        dist.init_process_group("gloo", rank=rank, world_size=world)
+        dist.init_process_group(backend, rank=rank, world_size=world)
         rpc.init_rpc(
             name="controller" if controller else f"w{rank}",
             rank=rank,

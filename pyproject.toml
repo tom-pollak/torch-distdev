@@ -5,7 +5,10 @@ description = "Distributed PyTorch development without the pain."
 readme = "README.md"
 authors = [{ name = "Tom Pollak", email = "tompollak1000@gmail.com" }]
 requires-python = ">=3.10"
-dependencies = ["torch"]
+dependencies = [
+    "numpy>=2.2.5",
+    "torch",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -13,5 +16,6 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "ipykernel>=6.29.5",
     "jupyter>=1.1.1",
 ]
