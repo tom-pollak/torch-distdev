@@ -14,6 +14,9 @@ import torch.distributed as dist
 import torch.distributed.rpc as rpc
 import torch.distributed.utils
 import torch.multiprocessing as mp
+from torch.distributed.distributed_c10d import get_default_backend_for_device
+
+__all__ = ["Cluster"]
 
 warnings.filterwarnings(
     "ignore",
@@ -91,9 +94,9 @@ def _exec_cell(src: str):
 
 
 class Cluster:
-    def __init__(self, backend: str, nprocs: int):
+    def __init__(self, device, nprocs: int):
         self.nprocs = nprocs
-        self.backend = backend
+        self.backend = get_default_backend_for_device(device)
         self.port = _free_port()
         self._log_q = mp.get_context("spawn").Queue()
         world = nprocs + 1

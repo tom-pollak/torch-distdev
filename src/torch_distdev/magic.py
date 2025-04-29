@@ -24,5 +24,3 @@ def _maybe_register_magic():
             raise RuntimeError("Call `init_dist()` before using %%distributed")
         return cl.launch_cell(cell)
 
-
-_maybe_register_magic()
