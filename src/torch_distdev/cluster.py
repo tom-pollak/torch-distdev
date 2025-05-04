@@ -49,6 +49,9 @@ def _logging_context(log_q):
     finally:
         listener.stop()
 
+def _remote_stop():
+    rpc.shutdown()
+    dist.destroy_process_group()
 
 def _set_logger(rank, log_q):
     root = logging.getLogger()
@@ -122,7 +125,6 @@ class Cluster:
             LOCAL_RANK=str(rank),
             WORLD_SIZE=str(world - 1),  # not including controller
         )
-        dist.init_process_group(backend, rank=rank, world_size=world)
         rpc.init_rpc(
             name="controller" if controller else f"w{rank}",
             rank=rank,
@@ -132,8 +134,7 @@ class Cluster:
             ),
         )
         if not controller:
-            rpc.shutdown()
-            dist.destroy_process_group()
+            dist.init_process_group(backend, rank=rank, world_size=world)
 
     @cache
     def _register(self, fn):
@@ -160,6 +161,7 @@ class Cluster:
         return resp
 
     def close(self):
+        for i in range(self.nprocs):
+            rpc.rpc_sync(f"w{i}", _remote_stop)
         rpc.shutdown()
-        dist.destroy_process_group()
         self.ctx.join()
