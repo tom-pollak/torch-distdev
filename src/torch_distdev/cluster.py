@@ -102,39 +102,40 @@ class Cluster:
         self.backend = get_default_backend_for_device(device)
         self.port = _free_port()
         self._log_q = mp.get_context("spawn").Queue()
-        world = nprocs + 1
         self.ctx: mp.ProcessContext = mp.start_processes(  # type: ignore
             self._worker,
-            args=(world, self.port, self._log_q, self.backend),
+            args=(self.nprocs, self.port, self._log_q, self.backend),
             nprocs=nprocs,
             start_method="spawn",
             join=False,
         )
         # controller -- final rank
         self._worker(
-            world - 1, world, self.port, self._log_q, self.backend, controller=True
+            self.nprocs, self.nprocs, self.port, self._log_q, self.backend, controller=True,
         )
 
     @staticmethod
-    def _worker(rank, world, port, log_q, backend, controller=False):
+    def _worker(rank, nprocs, port, log_q, backend, controller=False):
         _set_logger(rank, log_q)
         os.environ.update(
             MASTER_ADDR="127.0.0.1",
             MASTER_PORT=port,
             RANK=str(rank),
             LOCAL_RANK=str(rank),
-            WORLD_SIZE=str(world - 1),  # not including controller
+            WORLD_SIZE=str(nprocs),  # not including controller
         )
+        # controller included in rpc
         rpc.init_rpc(
             name="controller" if controller else f"w{rank}",
             rank=rank,
-            world_size=world,
+            world_size=nprocs + 1,
             rpc_backend_options=rpc.options.TensorPipeRpcBackendOptions(
                 init_method=f"tcp://127.0.0.1:{port}"
             ),
         )
+        # process group is only for workers
         if not controller:
-            dist.init_process_group(backend, rank=rank, world_size=world)
+            dist.init_process_group(backend, rank=rank, world_size=nprocs)
 
     @cache
     def _register(self, fn):

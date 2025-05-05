@@ -1,5 +1,7 @@
 from .cluster import Cluster
 
+__all__ =["init_dist", "destroy_dist", "get_cluster"]
+
 _GLOBAL_CLUSTER: Cluster | None = None
 
 
@@ -12,7 +14,7 @@ def init_dist(device, nprocs: int) -> Cluster:
     return _GLOBAL_CLUSTER
 
 def destroy_dist():
-    if cluster := get_cluster() is not None:
+    if cluster := get_cluster():
         cluster.close()
 
 def get_cluster() -> Cluster | None:

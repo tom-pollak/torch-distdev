@@ -3,6 +3,7 @@ import textwrap
 
 from .singleton import get_cluster
 
+__all__ = ["_maybe_register_magic"]
 
 def _maybe_register_magic():
     """Register %%distributed if we are running inside IPython/Jupyter."""
